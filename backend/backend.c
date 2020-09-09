@@ -19,6 +19,10 @@
 #include "backend/backend.h"
 #include "backend/multi.h"
 
+#if WLR_HAS_FBDEV_BACKEND
+#include <wlr/backend/fbdev.h>
+#endif
+
 #if WLR_HAS_X11_BACKEND
 #include <wlr/backend/x11.h>
 #endif
@@ -185,6 +189,35 @@ static struct wlr_backend *attempt_drm_backend(struct wl_display *display,
 	return primary_drm;
 }
 
+#if WLR_HAS_FBDEV_BACKEND
+static struct wlr_backend *attempt_fbdev_backend(struct wl_display *display,
+		struct wlr_backend *backend, struct wlr_session *session) {
+	struct wlr_device *fbdevs[8];
+	ssize_t num_fbdevs = wlr_session_find_fbdevs(session, 8, fbdevs);
+	struct wlr_backend *primary_fbdev = NULL;
+	wlr_log(WLR_INFO, "Found %zu framebuffer devices", num_fbdevs);
+
+	for (size_t i = 0; i < (size_t)num_fbdevs; ++i) {
+		struct wlr_backend *fbdev = wlr_fbdev_backend_create(display,
+			session, fbdevs[i], primary_fbdev);
+		if (!fbdev) {
+			wlr_log(WLR_ERROR, "Failed to open framebuffer device %d",
+				fbdevs[i]);
+			continue;
+		}
+
+		if (!primary_fbdev) {
+			primary_fbdev = fbdev;
+		}
+
+		// Each framebuffer backend has one output
+		wlr_fbdev_add_output(fbdev, 0, 0);
+	}
+
+	return primary_fbdev;
+}
+#endif
+
 static struct wlr_backend *attempt_backend_by_name(struct wl_display *display,
 		struct wlr_backend *backend, struct wlr_session **session,
 		const char *name) {
@@ -198,8 +231,9 @@ static struct wlr_backend *attempt_backend_by_name(struct wl_display *display,
 		return attempt_headless_backend(display);
 	} else if (strcmp(name, "noop") == 0) {
 		return attempt_noop_backend(display);
-	} else if (strcmp(name, "drm") == 0 || strcmp(name, "libinput") == 0) {
-		// DRM and libinput need a session
+	} else if (strcmp(name, "drm") == 0 || strcmp(name, "libinput") == 0
+			|| strcmp(name, "fbdev") == 0) {
+		// DRM, libinput and fbdev need a session
 		if (!*session) {
 			*session = wlr_session_create(display);
 			if (!*session) {
@@ -210,8 +244,12 @@ static struct wlr_backend *attempt_backend_by_name(struct wl_display *display,
 
 		if (strcmp(name, "libinput") == 0) {
 			return wlr_libinput_backend_create(display, *session);
-		} else {
+		} else if (strcmp(name, "drm") == 0) {
 			return attempt_drm_backend(display, backend, *session);
+#if WLR_HAS_FBDEV_BACKEND
+		} else if (strcmp(name, "fbdev") == 0) {
+			return attempt_fbdev_backend(display, backend, *session);
+#endif
 		}
 	}
 

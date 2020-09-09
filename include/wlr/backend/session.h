@@ -98,5 +98,7 @@ bool wlr_session_change_vt(struct wlr_session *session, unsigned vt);
 
 ssize_t wlr_session_find_gpus(struct wlr_session *session,
 	size_t ret_len, struct wlr_device **ret);
+ssize_t wlr_session_find_fbdevs(struct wlr_session *session,
+	size_t ret_len, struct wlr_device **ret);
 
 #endif
