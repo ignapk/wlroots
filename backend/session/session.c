@@ -278,8 +278,11 @@ out_dev:
 	return NULL;
 }
 
-static ssize_t explicit_find_gpus(struct wlr_session *session,
-		size_t ret_len, struct wlr_device *ret[static ret_len], const char *str) {
+static ssize_t find_devs_explicit(struct wlr_session *session,
+		size_t ret_len, struct wlr_device *ret[static ret_len], const char *str,
+		struct wlr_device (*open_if_dev)(struct wlr_session *restrict session,
+			const char *restrict path),
+		const char *dev_type) {
 	char *gpus = strdup(str);
 	if (!gpus) {
 		wlr_log_errno(WLR_ERROR, "Allocation failed");
@@ -294,9 +297,10 @@ static ssize_t explicit_find_gpus(struct wlr_session *session,
 			break;
 		}
 
-		ret[i] = open_if_kms(session, ptr);
+		ret[i] = open_if_dev(session, ptr);
 		if (!ret[i]) {
-			wlr_log(WLR_ERROR, "Unable to open %s as DRM device", ptr);
+			wlr_log(WLR_ERROR, "Unable to open %s as %s device",
+				ptr, dev_type);
 		} else {
 			++i;
 		}
@@ -306,15 +310,16 @@ static ssize_t explicit_find_gpus(struct wlr_session *session,
 	return i;
 }
 
-static struct udev_enumerate *enumerate_drm_cards(struct udev *udev) {
+static struct udev_enumerate *enumerate_drm_cards(struct udev *udev,
+		const char *udev_subsystem, const char *udev_sysname) {
 	struct udev_enumerate *en = udev_enumerate_new(udev);
 	if (!en) {
 		wlr_log(WLR_ERROR, "udev_enumerate_new failed");
 		return NULL;
 	}
 
-	udev_enumerate_add_match_subsystem(en, "drm");
-	udev_enumerate_add_match_sysname(en, "card[0-9]*");
+	udev_enumerate_add_match_subsystem(en, udev_subsystem);
+	udev_enumerate_add_match_sysname(en, udev_sysname);
 
 	if (udev_enumerate_scan_devices(en) != 0) {
 		wlr_log(WLR_ERROR, "udev_enumerate_scan_devices failed");
@@ -342,17 +347,22 @@ static void find_gpus_handle_add(struct wl_listener *listener, void *data) {
 	handler->added = true;
 }
 
-/* Tries to find the primary GPU by checking for the "boot_vga" attribute.
- * If it's not found, it returns the first valid GPU it finds.
+/* Tries to find the primary GPU/fbdev by checking for the "boot_vga" attribute.
+ * If it's not found, it returns the first valid dev it finds.
  */
-ssize_t wlr_session_find_gpus(struct wlr_session *session,
-		size_t ret_len, struct wlr_device **ret) {
-	const char *explicit = getenv("WLR_DRM_DEVICES");
+static ssize_t find_devs(struct wlr_session *session, size_t ret_len, struct wlr_device **ret,
+		const char *env_name, const char *udev_subsystem,
+		const char *udev_sysname,
+		struct wlr_device (*open_if_dev)(struct wlr_session *restrict session,
+			const char *restrict path),
+		const char *dev_type) {
+	const char *explicit = getenv(env_name);
 	if (explicit) {
-		return explicit_find_gpus(session, ret_len, ret, explicit);
+		return find_devs_explicit(session, ret_len, ret, explicit,
+			open_if_dev, dev_type);
 	}
 
-	struct udev_enumerate *en = enumerate_drm_cards(session->udev);
+	struct udev_enumerate *en = enumerate_drm_cards(session->udev, udev_subsystem, udev_sysname);
 	if (!en) {
 		return -1;
 	}
@@ -430,7 +440,7 @@ ssize_t wlr_session_find_gpus(struct wlr_session *session,
 		}
 
 		struct wlr_device *wlr_dev =
-			open_if_kms(session, udev_device_get_devnode(dev));
+			open_if_dev(session, udev_device_get_devnode(dev));
 		if (!wlr_dev) {
 			udev_device_unref(dev);
 			continue;
@@ -451,4 +461,10 @@ ssize_t wlr_session_find_gpus(struct wlr_session *session,
 	udev_enumerate_unref(en);
 
 	return i;
+}
+
+size_t wlr_session_find_gpus(struct wlr_session *session,
+		size_t ret_len, int *ret) {
+	return find_devs(session, ret_len, ret, "WLR_DRM_DEVICES",
+			"drm", "card[0-9]*", open_if_kms, "DRM");
 }
