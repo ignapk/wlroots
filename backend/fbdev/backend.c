@@ -66,9 +66,9 @@ static void backend_destroy(struct wlr_backend *wlr_backend) {
 
 	if (backend->egl == &backend->priv_egl) {
 		wlr_renderer_destroy(backend->renderer);
-		wlr_egl_finish(&backend->priv_egl);
+		wlr_egl_destroy(&backend->priv_egl);
 	}
-	wlr_session_close_file(backend->session, backend->fd);
+	wlr_session_close_file(backend->session, backend->dev);
 	free(backend);
 }
 
@@ -133,12 +133,12 @@ static bool backend_init(struct wlr_fbdev_backend *fbdev,
 }
 
 struct wlr_backend *wlr_fbdev_backend_create(struct wl_display *display,
-		struct wlr_session *session, int fbdev_fd, struct wlr_backend *parent) {
-	assert(display && session && fbdev_fd >= 0);
+		struct wlr_session *session, struct wlr_device *dev, struct wlr_backend *parent) {
+	assert(display && session && dev);
 	assert(!parent || wlr_backend_is_fbdev(parent));
 
 	struct fb_fix_screeninfo scr_fix;
-	ioctl(fbdev_fd, FBIOGET_FSCREENINFO, &scr_fix);
+	ioctl(dev->fd, FBIOGET_FSCREENINFO, &scr_fix);
 	wlr_log(WLR_INFO, "Initializing fbdev backend for %s", scr_fix.id);
 
 	struct wlr_fbdev_backend *fbdev = calloc(1, sizeof(struct wlr_fbdev_backend));
@@ -147,25 +147,14 @@ struct wlr_backend *wlr_fbdev_backend_create(struct wl_display *display,
 		return NULL;
 	}
 
-	static const EGLint config_attribs[] = {
-		EGL_SURFACE_TYPE, 0,
-		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-		EGL_BLUE_SIZE, 1,
-		EGL_GREEN_SIZE, 1,
-		EGL_RED_SIZE, 1,
-		EGL_NONE,
-	};
-
-	struct wlr_renderer *renderer = wlr_renderer_autocreate(&fbdev->priv_egl,
-		EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY,
-		(EGLint*)config_attribs, 0);
+	struct wlr_renderer *renderer = wlr_renderer_autocreate(&fbdev->backend);
 	if (!renderer) {
 		wlr_log(WLR_ERROR, "Failed to create renderer");
 		free(fbdev);
 		return NULL;
 	}
 
-	if (!backend_init(fbdev, display, session, fbdev_fd, parent, renderer)) {
+	if (!backend_init(fbdev, display, session, dev->fd, parent, renderer)) {
 		wlr_renderer_destroy(fbdev->renderer);
 		free(fbdev);
 		return NULL;

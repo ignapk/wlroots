@@ -321,7 +321,7 @@ out_dev:
 
 static ssize_t find_devs_explicit(struct wlr_session *session,
 		size_t ret_len, struct wlr_device *ret[static ret_len], const char *str,
-		struct wlr_device (*open_if_dev)(struct wlr_session *restrict session,
+		struct wlr_device * (*open_if_dev)(struct wlr_session *restrict session,
 			const char *restrict path),
 		const char *dev_type) {
 	char *gpus = strdup(str);
@@ -394,7 +394,7 @@ static void find_gpus_handle_add(struct wl_listener *listener, void *data) {
 static ssize_t find_devs(struct wlr_session *session, size_t ret_len, struct wlr_device **ret,
 		const char *env_name, const char *udev_subsystem,
 		const char *udev_sysname,
-		struct wlr_device (*open_if_dev)(struct wlr_session *restrict session,
+		struct wlr_device * (*open_if_dev)(struct wlr_session *restrict session,
 			const char *restrict path),
 		const char *dev_type) {
 	const char *explicit = getenv(env_name);
@@ -438,7 +438,7 @@ static ssize_t find_devs(struct wlr_session *session, size_t ret_len, struct wlr
 
 		wl_list_remove(&handler.listener.link);
 
-		en = enumerate_drm_cards(session->udev);
+		en = enumerate_drm_cards(session->udev, udev_subsystem, udev_sysname);
 		if (!en) {
 			return -1;
 		}

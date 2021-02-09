@@ -202,7 +202,7 @@ static struct wlr_backend *attempt_fbdev_backend(struct wl_display *display,
 			session, fbdevs[i], primary_fbdev);
 		if (!fbdev) {
 			wlr_log(WLR_ERROR, "Failed to open framebuffer device %d",
-				fbdevs[i]);
+				fbdevs[i]->fd);
 			continue;
 		}
 

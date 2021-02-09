@@ -14,7 +14,7 @@
 #include <wlr/types/wlr_output.h>
 
 struct wlr_backend *wlr_fbdev_backend_create(struct wl_display *display,
-	struct wlr_session *session, int fbdev_fd, struct wlr_backend *parent);
+	struct wlr_session *session, struct wlr_device *dev, struct wlr_backend *parent);
 
 struct wlr_output *wlr_fbdev_add_output(struct wlr_backend *backend,
 	unsigned int width, unsigned int height);

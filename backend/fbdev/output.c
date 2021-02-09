@@ -11,9 +11,11 @@
 
 #include <wlr/interfaces/wlr_output.h>
 #include <wlr/render/wlr_renderer.h>
+#include <wlr/render/egl.h>
 #include <wlr/util/log.h>
 #include "backend/fbdev.h"
 #include "util/signal.h"
+#include <stdio.h>
 
 static struct wlr_fbdev_output *fbdev_output_from_output(
 		struct wlr_output *wlr_output) {
@@ -23,7 +25,7 @@ static struct wlr_fbdev_output *fbdev_output_from_output(
 
 /* Set width, height to 0 to use default resolution */
 static bool create_fbo(struct wlr_fbdev_output *output, uint32_t width, uint32_t height) {
-	if (!wlr_egl_make_current(output->backend->egl, EGL_NO_SURFACE, NULL)) {
+	if (!wlr_egl_make_current(output->backend->egl)) {
 		return false;
 	}
 
@@ -92,7 +94,7 @@ static bool create_fbo(struct wlr_fbdev_output *output, uint32_t width, uint32_t
 }
 
 static void destroy_fbo(struct wlr_fbdev_output *output) {
-	if (!wlr_egl_make_current(output->backend->egl, EGL_NO_SURFACE, NULL)) {
+	if (!wlr_egl_make_current(output->backend->egl)) {
 		return;
 	}
 
@@ -133,7 +135,7 @@ static bool output_attach_render(struct wlr_output *wlr_output,
 	struct wlr_fbdev_output *output =
 		fbdev_output_from_output(wlr_output);
 
-	if (!wlr_egl_make_current(output->backend->egl, EGL_NO_SURFACE, NULL)) {
+	if (!wlr_egl_make_current(output->backend->egl)) {
 		return false;
 	}
 

@@ -26,6 +26,7 @@ struct wlr_fbdev_backend {
 	GLenum internal_format;
 
 	int fd;
+	struct wlr_device *dev;
 	struct wlr_session *session;
 };
 
